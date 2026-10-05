@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>即時互動文字雲 | Live Word Cloud</title>
+  <!-- TailwindCSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- WordCloud2.js -->
+  <script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.min.js"></script>
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.02); }
+    }
+    .live-dot {
+      animation: pulse-subtle 2s infinite ease-in-out;
+    }
+    #wordcloud-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-blue-500 selection:text-white transition-colors duration-200">
+
+  <!-- 頂部導覽與控制區 -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30 px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 text-xl font-bold">
+        ☁️
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-lg lg:text-xl tracking-tight text-white flex items-center gap-2">
+            課堂即時文字雲
+          </h1>
+          <span id="connection-status" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 live-dot"></span>
+            Firebase 連線中
+          </span>
+        </div>
+        <p class="text-xs text-slate-400">研習與課堂即時回饋系統 · Cloud Firestore 驅動</p>
+      </div>
+    </div>
+
+    <!-- 頂部即時統計數字 -->
+    <div class="flex items-center gap-4 bg-slate-800/80 px-4 py-1.5 rounded-xl border border-slate-700/60 text-sm">
+      <div class="flex items-center gap-1.5">
+        <span class="text-slate-400">總收集詞數:</span>
+        <span id="stat-total-words" class="font-bold text-blue-400 text-base">0</span>
+      </div>
+      <div class="w-px h-4 bg-slate-700"></div>
+      <div class="flex items-center gap-1.5">
+        <span class="text-slate-400">相異關鍵字:</span>
+        <span id="stat-unique-words" class="font-bold text-indigo-400 text-base">0</span>
+      </div>
+      <div class="w-px h-4 bg-slate-700 hidden sm:block"></div>
+      <div class="hidden sm:flex items-center gap-1.5">
+        <span class="text-slate-400">累計人次:</span>
+        <span id="stat-submissions" class="font-bold text-emerald-400 text-base">0</span>
+      </div>
+    </div>
+
+    <!-- 操作按鈕群 -->
+    <div class="flex items-center gap-2">
+      <!-- 學生填寫 QR Code 按鈕 -->
+      <button id="btn-open-qr" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-sm font-semibold transition shadow-md shadow-blue-600/30">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+        📱 學生掃碼填寫
+      </button>
+
+      <!-- 模擬測試按鈕 -->
+      <button id="btn-mock-data" title="寫入模擬測試資料" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-sm transition">
+        🎲 測試數據
+      </button>
+
+      <!-- 清空按鈕 -->
+      <button id="btn-clear-words" title="清空所有詞彙" class="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40 text-sm transition">
+        🗑️ 清空
+      </button>
+
+      <!-- 前往提交頁直接連結 -->
+      <a href="submit.html" target="_blank" title="在新分頁開啟學生提交頁" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-sm transition flex items-center">
+        🔗
+      </a>
+    </div>
+  </header>
+
+  <!-- 熱門排行榜條列 -->
+  <div id="top-keywords-bar" class="px-4 lg:px-8 py-2 bg-slate-800/40 border-b border-slate-800 flex items-center gap-2 overflow-x-auto text-xs text-slate-300">
+    <span class="font-bold text-amber-400 flex items-center gap-1 shrink-0">
+      🔥 最熱門關鍵字:
+    </span>
+    <div id="top-keywords-list" class="flex items-center gap-2 overflow-x-auto py-0.5">
+      <span class="text-slate-500">等待學員送出詞彙中...</span>
+    </div>
+  </div>
+
+  <!-- 主畫面：文字雲畫布空間 -->
+  <main class="flex-1 relative flex items-center justify-center overflow-hidden p-4">
+    <!-- 空狀態提示 -->
+    <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 z-10">
+      <div class="w-20 h-20 rounded-3xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-center text-4xl mb-4 shadow-xl">
+        💭
+      </div>
+      <h3 class="text-xl font-bold text-white mb-2">文字雲目前空空如也</h3>
+      <p class="text-slate-400 max-w-md text-sm mb-6">
+        邀請學生掃描 QR Code 立即送出關鍵詞，文字雲將會在畫面上即時動態綻放！
+      </p>
+      <div class="flex items-center gap-3">
+        <button onclick="document.getElementById('btn-open-qr').click()" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm transition shadow-lg shadow-blue-600/30">
+          顯示學生填寫 QR Code
+        </button>
+        <button onclick="document.getElementById('btn-mock-data').click()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-sm transition border border-slate-700">
+          快速注入示範詞彙
+        </button>
+      </div>
+    </div>
+
+    <!-- 文字雲 Canvas -->
+    <div id="canvas-container" class="w-full h-full relative flex items-center justify-center">
+      <canvas id="wordcloud-canvas"></canvas>
+    </div>
+
+    <!-- Tooltip 浮動標籤 -->
+    <div id="word-tooltip" class="fixed hidden pointer-events-none z-50 px-3 py-1.5 rounded-lg bg-slate-950/90 text-white text-xs font-semibold shadow-2xl border border-slate-700 backdrop-blur"></div>
+  </main>
+
+  <!-- 學生 QR Code 彈跳視窗 (Modal) -->
+  <div id="qr-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden transition-opacity">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center relative">
+      <button id="btn-close-qr" class="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition">
+        ✕
+      </button>
+
+      <div class="inline-flex p-3 rounded-2xl bg-blue-500/10 text-blue-400 mb-3 text-2xl">
+        📱
+      </div>
+      <h3 class="text-xl font-bold text-white mb-1">學生手機掃描填寫</h3>
+      <p class="text-xs text-slate-400 mb-5">請拿起手機開啟相機或 LINE 掃描 QR Code</p>
+
+      <!-- QR Code 容器 -->
+      <div class="bg-white p-4 rounded-2xl inline-block shadow-inner mb-4">
+        <div id="qrcode"></div>
+      </div>
+
+      <!-- 網址顯示與複製 -->
+      <div class="mb-4 text-left">
+        <label class="text-[11px] text-slate-400 font-medium mb-1 block">填寫網址：</label>
+        <div class="flex items-center gap-1.5 bg-slate-800 rounded-xl p-1.5 border border-slate-700">
+          <input id="submit-url-input" type="text" readonly class="bg-transparent text-xs text-slate-200 px-2 flex-1 focus:outline-none truncate" />
+          <button id="btn-copy-url" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition shrink-0">
+            複製
+          </button>
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <a id="direct-submit-link" href="submit.html" target="_blank" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+          直接開啟填寫頁 ↗
+        </a>
+        <button id="btn-modal-done" class="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition">
+          關閉
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 確認清空確認視窗 (Modal) -->
+  <div id="clear-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center">
+      <div class="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center text-2xl mx-auto mb-3">
+        ⚠️
+      </div>
+      <h3 class="text-lg font-bold text-white mb-2">確定要清空文字雲嗎？</h3>
+      <p class="text-xs text-slate-400 mb-6">這將會刪除 Firestore 資料庫中所有的詞彙記錄，此操作無法復原。</p>
+      <div class="flex gap-3">
+        <button id="btn-cancel-clear" class="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium border border-slate-700 transition">
+          取消
+        </button>
+        <button id="btn-confirm-clear" class="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition shadow-lg shadow-rose-600/30">
+          確定清空
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 提示訊息 Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm font-medium shadow-2xl flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <span id="toast-icon">ℹ️</span>
+    <span id="toast-message">訊息提示</span>
+  </div>
+
+  <!-- 主邏輯程式碼 -->
+  <script type="module">
+    import { 
+      db, 
+      collection, 
+      onSnapshot, 
+      query, 
+      orderBy, 
+      getDocs, 
+      deleteDoc, 
+      doc, 
+      addDoc, 
+      serverTimestamp,
+      writeBatch 
+    } from './firebase-config.js';
+
+    // 狀態變數
+    let wordsData = [];
+    let wordFrequencyMap = {};
+    let isDrawing = false;
+    let qrCodeInstance = null;
+
+    // DOM 元素
+    const canvas = document.getElementById('wordcloud-canvas');
+    const container = document.getElementById('canvas-container');
+    const emptyState = document.getElementById('empty-state');
+    const statTotalWords = document.getElementById('stat-total-words');
+    const statUniqueWords = document.getElementById('stat-unique-words');
+    const statSubmissions = document.getElementById('stat-submissions');
+    const topKeywordsList = document.getElementById('top-keywords-list');
+    const tooltip = document.getElementById('word-tooltip');
+
+    // 計算填寫頁完整網址
+    function getSubmitUrl() {
+      const currentUrl = window.location.href;
+      if (currentUrl.includes('index.html')) {
+        return currentUrl.replace('index.html', 'submit.html');
+      }
+      return currentUrl.replace(/\/$/, '') + '/submit.html';
+    }
+
+    // 初始化 QR Code
+    function initQRCode() {
+      const url = getSubmitUrl();
+      document.getElementById('submit-url-input').value = url;
+      document.getElementById('direct-submit-link').href = url;
+
+      const qrContainer = document.getElementById('qrcode');
+      qrContainer.innerHTML = '';
+      qrCodeInstance = new QRCode(qrContainer, {
+        text: url,
+        width: 180,
+        height: 180,
+        colorDark: "#0f172a",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    // 顯示 Toast 提示
+    function showToast(msg, icon = 'ℹ️') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-message').innerText = msg;
+      document.getElementById('toast-icon').innerText = icon;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    // 調整 Canvas 尺寸以適配容器
+    function resizeCanvas() {
+      if (!container || !canvas) return;
+      const rect = container.getBoundingClientRect();
+      canvas.width = Math.floor(rect.width);
+      canvas.height = Math.floor(rect.height);
+      renderWordCloud();
+    }
+
+    window.addEventListener('resize', () => {
+      clearTimeout(window._resizeTimer);
+      window._resizeTimer = setTimeout(resizeCanvas, 300);
+    });
+
+    // 繽紛調色盤 (高對比深色背景專用)
+    const colorPalette = [
+      '#60a5fa', '#38bdf8', '#818cf8', '#a78bfa', '#c084fc',
+      '#f472b6', '#fb7185', '#34d399', '#4ade80', '#facc15',
+      '#fb923c', '#2dd4bf', '#e879f9', '#93c5fd'
+    ];
+
+    // 繪製文字雲
+    function renderWordCloud() {
+      const entries = Object.entries(wordFrequencyMap);
+      if (entries.length === 0) {
+        emptyState.style.display = 'flex';
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
+
+      emptyState.style.display = 'none';
+
+      // 找出最大次數
+      const maxCount = Math.max(...entries.map(e => e[1]));
+      const minCount = Math.min(...entries.map(e => e[1]));
+
+      // 轉換成 WordCloud2 格式: [[word, size], ...]
+      // 根據畫布尺寸動態縮放字體
+      const minDim = Math.min(canvas.width, canvas.height);
+      const baseScale = Math.max(14, minDim / 28);
+      const maxScale = Math.max(48, minDim / 8);
+
+      const wordList = entries.map(([word, count]) => {
+        let size = baseScale;
+        if (maxCount > minCount) {
+          size = baseScale + ((count - minCount) / (maxCount - minCount)) * (maxScale - baseScale);
+        } else {
+          size = baseScale * 1.5;
+        }
+        return [word, Math.round(size)];
+      });
+
+      // 排序讓重要關鍵字優先放入中心
+      wordList.sort((a, b) => b[1] - a[1]);
+
+      WordCloud(canvas, {
+        list: wordList,
+        gridSize: Math.round(16 * canvas.width / 1024),
+        weightFactor: 1,
+        fontFamily: "'Segoe UI', 'Microsoft JhengHei', -apple-system, BlinkMacSystemFont, sans-serif",
+        color: (word, weight, fontSize, distance, theta) => {
+          return colorPalette[Math.floor(Math.random() * colorPalette.length)];
+        },
+        rotateRatio: 0.15,
+        rotationSteps: 2,
+        backgroundColor: 'transparent',
+        drawOutOfBound: false,
+        shrinkToFit: true,
+        hover: (item, dimension, event) => {
+          if (item && dimension) {
+            const count = wordFrequencyMap[item[0]] || 1;
+            tooltip.innerText = `詞彙: ${item[0]} (出現 ${count} 次)`;
+            tooltip.style.left = `${dimension.x + dimension.w / 2}px`;
+            tooltip.style.top = `${dimension.y - 30}px`;
+            tooltip.classList.remove('hidden');
+          } else {
+            tooltip.classList.add('hidden');
+          }
+        }
+      });
+    }
+
+    // 更新統計面板與排行榜
+    function updateStats(docs) {
+      statSubmissions.innerText = docs.length;
+      
+      let totalWords = 0;
+      wordFrequencyMap = {};
+
+      docs.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.word) {
+          // 支援一次送多個詞（以空格、逗點、頓號分開）
+          const tokens = data.word.trim().split(/[\s,，、]+/);
+          tokens.forEach(token => {
+            const w = token.trim();
+            if (w.length > 0) {
+              totalWords++;
+              wordFrequencyMap[w] = (wordFrequencyMap[w] || 0) + 1;
+            }
+          });
+        }
+      });
+
+      statTotalWords.innerText = totalWords;
+      const uniqueWords = Object.keys(wordFrequencyMap);
+      statUniqueWords.innerText = uniqueWords.length;
+
+      // 更新最熱門關鍵字清單
+      const sortedWords = Object.entries(wordFrequencyMap).sort((a, b) => b[1] - a[1]);
+      if (sortedWords.length === 0) {
+        topKeywordsList.innerHTML = `<span class="text-slate-500">等待學員送出詞彙中...</span>`;
+      } else {
+        const top5 = sortedWords.slice(0, 5);
+        topKeywordsList.innerHTML = top5.map(([word, count], idx) => {
+          const colors = [
+            'bg-amber-500/20 text-amber-300 border-amber-500/30',
+            'bg-blue-500/20 text-blue-300 border-blue-500/30',
+            'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+            'bg-slate-700/60 text-slate-300 border-slate-600',
+            'bg-slate-700/60 text-slate-300 border-slate-600'
+          ];
+          return `
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium ${colors[idx]}">
+              <span class="font-bold">#${idx + 1}</span>
+              <span>${word}</span>
+              <span class="opacity-70 text-[10px]">(${count})</span>
+            </span>
+          `;
+        }).join('');
+      }
+
+      renderWordCloud();
+    }
+
+    // 監聽 Firebase Firestore wordcloud_words 集合
+    const wordsCol = collection(db, 'wordcloud_words');
+    const q = query(wordsCol, orderBy('created_at', 'desc'));
+
+    onSnapshot(q, (snapshot) => {
+      wordsData = snapshot.docs;
+      updateStats(wordsData);
+    }, (error) => {
+      console.error("Firestore 連線錯誤:", error);
+      const statusBadge = document.getElementById('connection-status');
+      statusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20';
+      statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-400"></span> 連線中斷，重試中';
+    });
+
+    // 模擬測試數據
+    document.getElementById('btn-mock-data').addEventListener('click', async () => {
+      const mockPool = [
+        "AI Agent", "生成式AI", "自主學習", "自動化工作流", "Prompt",
+        "Claude Code", "即時互動", "激發動機", "創意思維", "專案式學習",
+        "雙向溝通", "ReAct框架", "課堂IRS", "雲端協作", "教學創新",
+        "AI Agent", "AI Agent", "即時互動", "教學創新" // 增加熱門權重
+      ];
+      
+      const randomWords = [];
+      const count = 3 + Math.floor(Math.random() * 4);
+      for (let i = 0; i < count; i++) {
+        const item = mockPool[Math.floor(Math.random() * mockPool.length)];
+        randomWords.push(item);
+      }
+
+      try {
+        for (const w of randomWords) {
+          await addDoc(wordsCol, {
+            word: w,
+            student_id: "demo",
+            created_at: serverTimestamp()
+          });
+        }
+        showToast(`已成功注入 ${randomWords.length} 筆示範詞彙！`, '🎉');
+      } catch (err) {
+        console.error(err);
+        showToast('注入失敗: ' + err.message, '❌');
+      }
+    });
+
+    // 清空文字雲邏輯
+    const clearModal = document.getElementById('clear-modal');
+    document.getElementById('btn-clear-words').addEventListener('click', () => {
+      clearModal.classList.remove('hidden');
+    });
+    document.getElementById('btn-cancel-clear').addEventListener('click', () => {
+      clearModal.classList.add('hidden');
+    });
+    document.getElementById('btn-confirm-clear').addEventListener('click', async () => {
+      clearModal.classList.add('hidden');
+      try {
+        const snapshot = await getDocs(wordsCol);
+        if (snapshot.empty) {
+          showToast('目前資料庫已經是空的囉！', 'ℹ️');
+          return;
+        }
+        const batch = writeBatch(db);
+        snapshot.docs.forEach(docSnap => {
+          batch.delete(docSnap.ref);
+        });
+        await batch.commit();
+        showToast('已成功清空所有詞彙！', '🧹');
+      } catch (err) {
+        console.error(err);
+        showToast('清空失敗: ' + err.message, '❌');
+      }
+    });
+
+    // QR Code 視窗互動
+    const qrModal = document.getElementById('qr-modal');
+    document.getElementById('btn-open-qr').addEventListener('click', () => {
+      if (!qrCodeInstance) initQRCode();
+      qrModal.classList.remove('hidden');
+    });
+    document.getElementById('btn-close-qr').addEventListener('click', () => {
+      qrModal.classList.add('hidden');
+    });
+    document.getElementById('btn-modal-done').addEventListener('click', () => {
+      qrModal.classList.add('hidden');
+    });
+    document.getElementById('btn-copy-url').addEventListener('click', () => {
+      const input = document.getElementById('submit-url-input');
+      input.select();
+      navigator.clipboard.writeText(input.value).then(() => {
+        showToast('填寫網址已複製到剪貼簿！', '📋');
+      });
+    });
+
+    // 頁面初次載入
+    window.addEventListener('DOMContentLoaded', () => {
+      resizeCanvas();
+      initQRCode();
+    });
+  </script>
+</body>
+</html>

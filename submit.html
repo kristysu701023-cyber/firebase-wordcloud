@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>提交關鍵詞 | 課堂即時文字雲</title>
+  <!-- TailwindCSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes bounce-short {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    .bounce-ready {
+      animation: bounce-short 1.5s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between font-sans selection:bg-blue-500 selection:text-white p-4 sm:p-6">
+
+  <!-- 頂部資訊 -->
+  <header class="max-w-md w-full mx-auto pt-2 pb-4 text-center">
+    <div class="inline-flex p-3 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-xl shadow-blue-500/20 text-3xl mb-3 bounce-ready">
+      ☁️
+    </div>
+    <h1 class="text-2xl font-black tracking-tight text-white mb-1">
+      課堂想法即時匯聚
+    </h1>
+    <p class="text-xs text-slate-400">
+      輸入你的關鍵詞，瞬間同步至大螢幕動態文字雲！
+    </p>
+  </header>
+
+  <!-- 表單主卡片 -->
+  <main class="max-w-md w-full mx-auto bg-slate-800/90 border border-slate-700/80 rounded-3xl p-6 shadow-2xl backdrop-blur">
+    <form id="word-form" class="space-y-5">
+      
+      <!-- 學生座號或暱稱 (選填) -->
+      <div>
+        <label for="student-id" class="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+          <span>🏷️ 座號或暱稱 <span class="text-slate-500 font-normal">(選填，可匿名)</span></span>
+        </label>
+        <input 
+          type="text" 
+          id="student-id" 
+          placeholder="例如：08 小智 (留空則匿名)" 
+          maxlength="20"
+          class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition"
+        />
+      </div>
+
+      <!-- 關鍵詞輸入框 -->
+      <div>
+        <label for="word-input" class="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+          <span>💡 你的關鍵詞或心得 <span class="text-rose-400">*</span></span>
+          <span class="text-[11px] text-slate-500">可用空格或逗點分開多詞</span>
+        </label>
+        <textarea 
+          id="word-input" 
+          rows="3" 
+          required
+          placeholder="例如：AI Agent 創新教學 超實用" 
+          maxlength="80"
+          class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition resize-none"
+        ></textarea>
+      </div>
+
+      <!-- 快捷點選推薦詞彙 -->
+      <div>
+        <span class="text-[11px] text-slate-400 block mb-1.5 font-medium">✨ 點擊快速填入熱門詞彙：</span>
+        <div class="flex flex-wrap gap-1.5">
+          <button type="button" class="quick-tag px-2.5 py-1 rounded-lg bg-slate-700/60 hover:bg-slate-700 border border-slate-600/60 text-xs text-slate-300 transition">AI Agent</button>
+          <button type="button" class="quick-tag px-2.5 py-1 rounded-lg bg-slate-700/60 hover:bg-slate-700 border border-slate-600/60 text-xs text-slate-300 transition">自主學習</button>
+          <button type="button" class="quick-tag px-2.5 py-1 rounded-lg bg-slate-700/60 hover:bg-slate-700 border border-slate-600/60 text-xs text-slate-300 transition">超實用</button>
+          <button type="button" class="quick-tag px-2.5 py-1 rounded-lg bg-slate-700/60 hover:bg-slate-700 border border-slate-600/60 text-xs text-slate-300 transition">互動教學</button>
+          <button type="button" class="quick-tag px-2.5 py-1 rounded-lg bg-slate-700/60 hover:bg-slate-700 border border-slate-600/60 text-xs text-slate-300 transition">創意思考</button>
+        </div>
+      </div>
+
+      <!-- 送出按鈕 -->
+      <button 
+        type="submit" 
+        id="submit-btn"
+        class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.98] text-white font-bold text-base shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition"
+      >
+        <span id="btn-text">🚀 立即送出上大螢幕</span>
+        <span id="btn-spinner" class="hidden">
+          <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </span>
+      </button>
+
+      <!-- 成功提示視窗區塊 -->
+      <div id="success-alert" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-center animate-fade-in">
+        <p class="text-sm font-bold flex items-center justify-center gap-1.5">
+          <span>🎉</span> 送出成功！
+        </p>
+        <p class="text-xs text-emerald-300/80 mt-1">
+          您的詞彙已即時同步到大螢幕，可以繼續送出下一個詞喔！
+        </p>
+      </div>
+
+    </form>
+  </main>
+
+  <!-- 底部連結 -->
+  <footer class="max-w-md w-full mx-auto py-4 text-center text-xs text-slate-500 flex items-center justify-center gap-4">
+    <a href="index.html" class="hover:text-blue-400 transition flex items-center gap-1">
+      👀 觀看大螢幕文字雲 ↗
+    </a>
+    <span>·</span>
+    <span>Firebase Cloud Firestore 驅動</span>
+  </footer>
+
+  <!-- 邏輯腳本 -->
+  <script type="module">
+    import { db, collection, addDoc, serverTimestamp } from './firebase-config.js';
+
+    const form = document.getElementById('word-form');
+    const wordInput = document.getElementById('word-input');
+    const studentInput = document.getElementById('student-id');
+    const submitBtn = document.getElementById('submit-btn');
+    const btnText = document.getElementById('btn-text');
+    const btnSpinner = document.getElementById('btn-spinner');
+    const successAlert = document.getElementById('success-alert');
+
+    // 快捷詞彙標籤點選
+    document.querySelectorAll('.quick-tag').forEach(tag => {
+      tag.addEventListener('click', () => {
+        const text = tag.innerText;
+        const current = wordInput.value.trim();
+        if (!current) {
+          wordInput.value = text;
+        } else {
+          wordInput.value = current + ' ' + text;
+        }
+        wordInput.focus();
+      });
+    });
+
+    // 表單提交
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const rawText = wordInput.value.trim();
+      const studentId = studentInput.value.trim() || '匿名學員';
+
+      if (!rawText) return;
+
+      // 拆解輸入詞彙（以空格、逗點、頓號切割）
+      const tokens = rawText.split(/[\s,，、]+/).map(t => t.trim()).filter(t => t.length > 0);
+      if (tokens.length === 0) return;
+
+      // 按鈕載入狀態
+      submitBtn.disabled = true;
+      btnText.innerText = '正在傳送...';
+      btnSpinner.classList.remove('hidden');
+      successAlert.classList.add('hidden');
+
+      try {
+        const wordsCol = collection(db, 'wordcloud_words');
+        
+        // 逐筆寫入 Firestore
+        for (const token of tokens) {
+          await addDoc(wordsCol, {
+            word: token,
+            student_id: studentId,
+            created_at: serverTimestamp()
+          });
+        }
+
+        // 送出成功，重置輸入框（保留座號方便連續輸入）
+        wordInput.value = '';
+        successAlert.classList.remove('hidden');
+        
+        // 5秒後隱藏成功通知
+        setTimeout(() => {
+          successAlert.classList.add('hidden');
+        }, 5000);
+
+      } catch (err) {
+        console.error('送出失敗:', err);
+        alert('送出失敗：' + (err.message || '請檢查網路連線'));
+      } finally {
+        submitBtn.disabled = false;
+        btnText.innerText = '🚀 立即送出上大螢幕';
+        btnSpinner.classList.add('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
